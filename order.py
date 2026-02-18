@@ -12,15 +12,56 @@ class Order:
     def __init__(self):
         # Assign an attribute ".data" to all new instances of Order
         self.data = Olist().get_data()
-
     def get_wait_time(self, is_delivered=True):
         """
         Returns a DataFrame with:
         [order_id, wait_time, expected_wait_time, delay_vs_expected, order_status]
         and filters out non-delivered orders unless specified
         """
-        # Hint: Within this instance method, you have access to the instance of the class Order in the variable self, as well as all its attributes
-        pass  # YOUR CODE HERE
+        orders = self.data["orders"].copy()
+
+        cols = [
+            "order_id",
+            "order_status",
+            "order_purchase_timestamp",
+            "order_delivered_customer_date",
+            "order_estimated_delivery_date",
+        ]
+        df = orders[cols].copy()
+
+        if is_delivered:
+            df = df[df["order_status"] == "delivered"].copy()
+
+        # datetime'a çevir
+        for col in [
+            "order_purchase_timestamp",
+            "order_delivered_customer_date",
+            "order_estimated_delivery_date",
+        ]:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+
+        # ondalıklı gün cinsinden (NaN kalabilir)
+        df["wait_time"] = (
+            (df["order_delivered_customer_date"] - df["order_purchase_timestamp"])
+            .dt.total_seconds() / 86400
+        )
+        df["expected_wait_time"] = (
+            (df["order_estimated_delivery_date"] - df["order_purchase_timestamp"])
+            .dt.total_seconds() / 86400
+        )
+
+        delay = df["wait_time"] - df["expected_wait_time"]
+
+        # NaN'leri koru; negatifse 0, pozitifse delay
+        df["delay_vs_expected"] = np.where(
+            delay.isna(),
+            np.nan,
+            np.where(delay > 0, delay, 0.0)
+        )
+
+        return df[["order_id", "wait_time", "expected_wait_time", "delay_vs_expected", "order_status"]]
+
+
 
     def get_review_score(self):
         """
